@@ -1,7 +1,7 @@
 default:main
 
-main:main.o server.o utils.o handler.o
-	gcc main.o server.o utils.o handler.o -o server -Wall
+main:main.o server.o utils.o handler.o 
+	gcc main.o server.o utils.o handler.o -o server -lpthread -Wall
 
 main.o: main.c
 	gcc -c main.c -o main.o -Wall

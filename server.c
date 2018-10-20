@@ -54,7 +54,7 @@ void run_server(struct Server *sv){
     struct Client* clients[MAX_CLIENTS];
     for (int i = 0; i < MAX_CLIENTS; ++i){
         clients[i] = (struct Client*)malloc(sizeof(struct Client));
-        clients[i]->sock = -1;
+        init_client(clients[i]);
     }
 
     while(1){
@@ -77,8 +77,6 @@ void run_server(struct Server *sv){
         //printf("before select\n");
         act = select(max_sock + 1, &readfds, NULL, NULL, NULL);
 
-        printf("select %d\n", act);
-
         if(act < 0 && errno != EINTR){
             perror("select error");
             continue;
@@ -98,8 +96,10 @@ void run_server(struct Server *sv){
             int i = 0;
             for(; i < MAX_CLIENTS && clients[i]->sock != -1; ++i);
 
-            if(i >= MAX_CLIENTS)
+            if(i >= MAX_CLIENTS){
+                over_connections(cs);
                 continue;
+            }
             
             clients[i]->sock = cs;
             clients[i]->addr = client_addr;
@@ -107,7 +107,8 @@ void run_server(struct Server *sv){
 
             printf("sock:%d\n", clients[i]->sock);
 
-            send_message(clients[i], 0);
+            clients[i]->message = "220 Anonymous FTP server ready.\r\n";
+            send_message(clients[i]);
 
         }else{
 
@@ -129,6 +130,7 @@ void run_server(struct Server *sv){
                 if(n < 0){
                     perror("read error");
                     close(cs);
+                    init_client(clients[i]);
                     read_error = 1;
                     break;
                 }else if(n == 0){
@@ -152,11 +154,17 @@ void run_server(struct Server *sv){
             char command[20];
             char message[200];
             processing_command(sentence, command, message);
-            printf("%s\n", command);
-            printf("%s\n", message);
+            //printf("%s\n", command);
+            //printf("%s\n", message);
 
             handle_command(clients[i], command, message);
 
         }
     }
+}
+
+void init_client(struct Client* c){
+    c->sock = -1;
+    c->login = 0;
+    c->type = 0;
 }

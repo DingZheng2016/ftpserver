@@ -21,12 +21,13 @@ struct Client{
 
     char *message;
     char *root_dir;
-    char *dir;
+    char dir[200];
     char filename[200];
     char username[200];
     char password[200];
+    char rn_be[200];
     int login;// 0 for not login, 1 for login
-    int type;
+    int type;// 1 for I, 10 for A
     int filefd;
     int mode; // 1 for PORT, 2 for PASV, 0 for none
 };

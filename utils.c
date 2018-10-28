@@ -127,6 +127,32 @@ void *store_file(void *cv){
     return NULL;
 }
 
+void *transfer_list(void *cv){
+    struct Client* c = cv;
+    FILE *fs = popen("ls -l", "r");
+    char buffer[8192];
+    while(fgets(buffer, 8191, fs)){
+        int p = 0;
+        int len = strlen(buffer);
+        while (p < len) {
+            int n = write(c->sockfd, buffer + p, len - p);
+            if (n < 0) {
+                perror("write error.");
+                close(c->sockfd);
+                return NULL;
+            } else {
+                p += n;
+            }
+        }
+    }
+
+    c->message = "226 Transfer complete.\r\n";
+    send_message(c);
+    close(c->sockfd);
+    c->mode = 0;
+    return NULL;
+}
+
 int get_random_port(){
     srand((unsigned)(time(NULL)));
     return rand() % (65536 - 20000) + 20000;

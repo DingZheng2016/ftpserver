@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #include "handler.h"
 #include "utils.h"
@@ -12,7 +13,9 @@
 char* const message_unlogin = "530 Please log in with USER and PASS first.\r\n";
 char* const message_unknowncommand = "500 Syntax error, command unrecognized.\r\n";
 char* const message_modeundefined = "503 Bad sequence of commands.\r\n";
+char* const message_rntowithoutrnfr = "503 Bad sequence of commands.\r\n";
 char* const message_connectionerror = "426 TCP connection was established but then broken by the client or by network failure.\r\n";
+char* const message_unsupportedtype = "501 Unsupported type.\r\n";
 
 int handle_command(struct Client* c, char* command, char* message){
     if(strcmp(command, "USER") == 0)
@@ -96,6 +99,14 @@ int handle_TYPE(struct Client* c, char* type){
         c->message = "200 Type set to I.\r\n";
         send_message(c);
         c->type = 1;
+    }else if(strcmp(type, "A") == 0){
+        c->message = "200 Type set to A.\r\n";
+        send_message(c);
+        c->type = 10;
+    }else{
+        c->message = message_unsupportedtype;
+        send_message(c);
+        return 1;
     }
     return 0;
 }
@@ -308,6 +319,43 @@ int handle_CWD(struct Client* c, char* dir){
         return 1;
     }
 
+    if(dir[strlen(dir) - 1] != '/')
+        strcat(dir, "/");
+
+    char path[200];
+    strcpy(path, c->root_dir);
+    if(dir[0] == '/'){
+        strcat(path, dir);
+        DIR* d = opendir(path);
+        if(d){
+            c->message = "250 Okay.\r\n";
+            send_message(c);
+            strcpy(c->dir, dir);
+        }else{
+            c->message = "550 No such file or directory.\r\n";
+            send_message(c);
+            return 1;
+        }
+    }else{
+        //char cur[200];
+        //strcpy(cur, c->dir);
+        //strcat(cur, dir);
+
+        strcat(path, c->dir);
+        strcat(path, dir);
+
+        DIR* d = opendir(path);
+        if(d){
+            c->message = "250 Okay.\r\n";
+            send_message(c);
+            strcat(c->dir, dir);
+        }else{
+            c->message = "550 No such file or directory.\r\n";
+            send_message(c);
+            return 1;
+        }
+    }
+
     return 0;
 }
 
@@ -319,6 +367,11 @@ int handle_PWD(struct Client* c){
         return 1;
     }
 
+    char message[300];
+    sprintf(message, "257 \"%s\" is current directory.\r\n", c->dir);
+    c->message = message;
+    send_message(c);
+
     return 0;
 }
 
@@ -326,6 +379,23 @@ int handle_MKD(struct Client* c, char* dir){
 
     if(!c->login){
         c->message = message_unlogin;
+        send_message(c);
+        return 1;
+    }
+
+    char path[200];
+    strcpy(path, c->root_dir);
+    strcat(path, c->dir);
+    strcat(path, dir);
+
+    char message[300];
+    if(mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1){    
+        sprintf(message, "550 \"%s\" created failed.\r\n", dir);
+        c->message = message;
+        send_message(c);
+    }else{
+        sprintf(message, "250 \"%s\" created successfully.\r\n", dir);
+        c->message = message;
         send_message(c);
         return 1;
     }
@@ -341,6 +411,47 @@ int handle_LIST(struct Client *c){
         return 1;
     }
 
+    if(c->mode == 1){
+
+        if(connect(c->sockfd, (struct sockaddr*)&(c->addr), sizeof(c->addr)) == -1){
+            perror("connect error");
+            c->message = message_connectionerror;
+            send_message(c);
+            return 1;
+        }
+
+        char message[200];
+        sprintf(message, "150 Opening data connection for contents of current directory.\r\n");
+        c->message = message;
+        send_message(c);
+
+        pthread_t thread_id; 
+        pthread_create(&thread_id, NULL, transfer_list, c);
+
+
+    }else if(c->mode == 2){
+
+        if((c->sockfd = accept(c->socklfd, NULL, NULL)) == -1){
+            perror("accept error");
+            return 1;
+        }
+
+        printf("PASV accepted.\n");
+
+        char message[200];
+        sprintf(message, "150 Opening data connection for contents of current directory.\r\n");
+        c->message = message;
+        send_message(c);
+
+        pthread_t thread_id; 
+        pthread_create(&thread_id, NULL, transfer_list, c);
+
+    }else{
+        c->message = message_modeundefined;
+        send_message(c);
+        return 1;
+    }
+
     return 0;
 }
 
@@ -351,6 +462,24 @@ int handle_RMD(struct Client* c, char* dir){
         send_message(c);
         return 1;
     }
+
+    char path[200];
+    strcpy(path, c->root_dir);
+    strcat(path, c->dir);
+    strcat(path, dir);
+
+    char message[300];
+    if(rmdir(path) == -1){    
+        sprintf(message, "550 \"%s\" removed failed.\r\n", dir);
+        c->message = message;
+        send_message(c);
+    }else{
+        sprintf(message, "250 \"%s\" removed successfully.\r\n", dir);
+        c->message = message;
+        send_message(c);
+        return 1;
+    }
+
 
     return 0;
 }
@@ -363,6 +492,24 @@ int handle_RNFR(struct Client* c, char* dir){
         return 1;
     }
 
+    char path[200];
+    strcpy(path, c->root_dir);
+    if(dir[0] == '/'){
+        strcat(path, dir);
+    }else{
+        strcat(path, c->dir);
+        strcat(path, dir);
+    }
+
+    if(access(path, F_OK) != -1){
+        strcpy(c->rn_be, path);
+        c->message = "350 file exists.\r\n";
+        send_message(c);
+    }else{
+        c->message = "550 file does not exist.\r\n";
+        send_message(c);
+        return 1;
+    }
     return 0;
 }
 
@@ -373,6 +520,31 @@ int handle_RNTO(struct Client* c, char* dir){
         send_message(c);
         return 1;
     }
+
+    if(strlen(c->rn_be) == 0){
+        c->message = message_rntowithoutrnfr;
+        send_message(c);
+        return 1;
+    }
+
+    char path[200];
+    strcpy(path, c->root_dir);
+    if(dir[0] == '/'){
+        strcat(path, dir);
+    }else{
+        strcat(path, c->dir);
+        strcat(path, dir);
+    }
+
+    if(rename(c->rn_be, path) != -1){
+        c->message = "250 renamed successfully.\r\n";
+        send_message(c);
+    }else{
+        c->message = "550 renamed failed.\r\n";
+        send_message(c);
+    }
+
+    memset(c->rn_be, 0, sizeof(c->rn_be));
 
     return 0;
 }

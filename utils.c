@@ -9,9 +9,25 @@
 int deal_with_parameters(int* port, char* root_dir, int argc, char** argv){
     if(argc == 1)
         return 0;
-    if(argc != 3 || argc != 5)
+    
+    if(argc != 3 && argc != 5)
         return -1;
-    //todo
+    
+    if(argc == 3){
+        if(strcmp(argv[1], "-port") == 0)
+            *port = atoi(argv[2]);
+        else if(strcmp(argv[2], "-root") == 0)
+            strcpy(root_dir, argv[2]);
+    }
+        
+    if(argc == 5){
+        for(int i = 0; i < 2; ++i)
+            if(strcmp(argv[i * 2 + 1], "-port") == 0)
+                *port = atoi(argv[i * 2 + 2]);
+            else if(strcmp(argv[i * 2 + 1], "-root") == 0)
+                strcpy(root_dir, argv[i * 2 + 2]);
+    }
+
     return 0;
 }
 
@@ -37,7 +53,12 @@ void *transfer_file(void* cv){
     struct Client* c = cv;
 
     char buffer[8192];
-    c->filefd = open(c->filename,  O_RDONLY);
+    char file_path[200];
+    strcpy(file_path, c->root_dir);
+    strcat(file_path, c->dir);
+    strcat(file_path, c->filename);
+    printf("%s\n", file_path);
+    c->filefd = open(file_path,  O_RDONLY);
 
     while (1) {
         int bytes_read = read(c->filefd, buffer, sizeof(buffer));
@@ -63,6 +84,46 @@ void *transfer_file(void* cv){
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
     close(c->sockfd);
+    c->mode = 0;
+    return NULL;
+}
+
+void *store_file(void *cv){
+    struct Client* c = cv;
+
+    char file_path[200];
+    strcpy(file_path, c->root_dir);
+    strcat(file_path, c->dir);
+    strcat(file_path, c->filename);
+
+    int fp;
+    fp = open(file_path, O_WRONLY | O_CREAT , S_IRWXG | S_IRWXO | S_IRWXU);
+
+    char buffer[8192];
+    int p = 0;
+
+    while (1) {
+        int bytes_read = read(c->sockfd, buffer + p, 8191 - p);
+        if (bytes_read < 0) {
+            perror("read error.");
+            close(c->sockfd);
+            break;
+        } else if (bytes_read == 0) {
+            break;
+        }
+
+        int file_state = write(fp, buffer, bytes_read);
+        if(file_state == 0){
+            printf("Error when writing the file!");
+            break;
+        }
+    }
+    close(fp);
+
+    c->message = "226 Transfer complete.\r\n";
+    send_message(c);
+    close(c->sockfd);
+    c->mode = 0;
     return NULL;
 }
 

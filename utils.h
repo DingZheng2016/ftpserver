@@ -20,6 +20,8 @@ int over_connections(int fd);
 
 void *transfer_file(void*);
 
+void *store_file(void*);
+
 int get_random_port();
 
 int get_local_ip(int*, int*, int*, int*);

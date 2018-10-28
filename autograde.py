@@ -38,49 +38,36 @@ def create_test_file(filename):
 
 def test(port=21, directory='/tmp'):
   global credit
-
   if port == 21 and directory == '/tmp':
     server = subprocess.Popen('./server', stdout=subprocess.PIPE)
   else:
     server = subprocess.Popen(['./server', '-port', '%d' % port, '-root', directory], stdout=subprocess.PIPE)
-
   time.sleep(0.1)
   try:
     ftp = FTP()
     # connect
-    print 'start testing'
-    if not ftp.connect('127.0.0.1', port).startswith('220'): 
+    if not ftp.connect('127.0.0.1', port).startswith('220'):
       print 'You missed response 220'
       credit -= minor
-    else:
-      print 'connect correct'
     # login
     if not ftp.login().startswith('230'):
       print 'You missed response 230'
       credit -= minor
-    else:
-      print 'login correct'
     # SYST
     if ftp.sendcmd('SYST') != '215 UNIX Type: L8':
       print 'Bad response for SYST'
       credit -= minor
-    else:
-      print 'SYST correct'
     # TYPE
     if ftp.sendcmd('TYPE I') != '200 Type set to I.':
       print 'Bad response for TYPE I'
       credit -= minor
-    else:
-      print 'TYPE correct'
     # PORT download
     filename = 'test%d.data' % random.randint(100, 200)
     create_test_file(directory + '/' + filename)
     ftp.set_pasv(False)
-    
     if not ftp.retrbinary('RETR %s' % filename, open(filename, 'wb').write).startswith('226'):
       print 'Bad response for RETR'
       credit -= minor
-    '''
     if not filecmp.cmp(filename, directory + '/' + filename):
       print 'Something wrong with RETR'
       credit -= major
@@ -100,14 +87,11 @@ def test(port=21, directory='/tmp'):
       credit -= major
     os.remove(directory + '/' + filename)
     os.remove(filename)
-    '''
     # QUIT
     if not ftp.quit().startswith('221'):
       print 'Bad response for QUIT'
       credit -= minor
-    else:
-      print 'quit correct'
-    #ftp.quit()
+    ftp2.quit()
   except Exception as e:
     print 'Exception occurred:', e
     credit = 0
@@ -117,7 +101,6 @@ build()
 # Test 1
 test()
 # Test 2
-'''
 port = random.randint(2000, 3000)
 directory = ''.join(random.choice(string.ascii_letters) for x in xrange(10))
 if os.path.isdir(directory):
@@ -129,4 +112,3 @@ shutil.rmtree(directory)
 subprocess.Popen(['make', 'clean'], stdout=subprocess.PIPE)
 # Result
 print 'Your credit is %d' % credit
-'''

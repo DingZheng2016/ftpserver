@@ -104,6 +104,8 @@ void run_server(struct Server *sv){
             clients[i]->sock = cs;
             clients[i]->addr = client_addr;
             clients[i]->len = client_len;
+            clients[i]->root_dir = sv->root_dir;
+            clients[i]->dir = "/";
 
             printf("sock:%d\n", clients[i]->sock);
 
@@ -165,6 +167,9 @@ void run_server(struct Server *sv){
 
 void init_client(struct Client* c){
     c->sock = -1;
+    c->sockfd = -1;
+    c->socklfd = -1;
+    c->filefd = -1;
     c->login = 0;
     c->type = 0;
 }

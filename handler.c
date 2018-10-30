@@ -14,8 +14,11 @@ char* const message_unlogin = "530 Please log in with USER and PASS first.\r\n";
 char* const message_unknowncommand = "500 Syntax error, command unrecognized.\r\n";
 char* const message_modeundefined = "503 Bad sequence of commands.\r\n";
 char* const message_rntowithoutrnfr = "503 Bad sequence of commands.\r\n";
+char* const message_dataconnectionerror = "425 Can't open data connection.\r\n";
 char* const message_connectionerror = "426 TCP connection was established but then broken by the client or by network failure.\r\n";
 char* const message_unsupportedtype = "501 Unsupported type.\r\n";
+char* const message_alreadylogin = "530 Can't change from guest user.\r\n";
+char* const message_errorlogin = "530 Login incorrect.\r\n";
 
 int handle_command(struct Client* c, char* command, char* message){
     if(strcmp(command, "USER") == 0)
@@ -58,25 +61,65 @@ int handle_command(struct Client* c, char* command, char* message){
 }
 
 int handle_USER(struct Client* c, char* username){
-    if(strcmp(username, "anonymous") == 0){
-        c->message = "331 Guest login ok, send your complete e-mail address as password.\r\n";
+    /*
+     * Handle USER command.
+     * If already logged in, return 530.
+     * Don't check the username.
+     * Just return different messages according to whether username is anonymous.
+     * Return 331 if not logged in.
+     */
+    if(c->login == 1){
+        c->message = message_alreadylogin;
         send_message(c);
-        strcpy(c->username, username);
+        return 1;      
     }
+
+    if(strcmp(username, "anonymous") == 0)
+        c->message = "331 Guest login ok, send your complete e-mail address as password.\r\n";
+    else
+        c->message = "331 Please specify the password.\r\n";
+    
+    send_message(c);
+    strcpy(c->username, username);
     return 0;
 }
 
 int handle_PASS(struct Client* c, char* password){
+    /*
+     * Handle PASS command.
+     * If already logged in, return 230.
+     * Check the username and the password.
+     * Return 530 if error else return 230.
+     */
+    if(c->login == 1){
+        c->message = "230 Already logged in.\r\n";
+        send_message(c);
+        return 1;
+    }
+
     if(strcmp(c->username, "anonymous") == 0){
         c->message = "230 login successfully.\r\n";
         send_message(c);
         strcpy(c->password, password);
         c->login = 1;
+    }else if(checkuserinfo(c->username, password) == 0){
+        c->message = "230 login successfully.\r\n";
+        send_message(c);
+        strcpy(c->password, password);
+        c->login = 1;
+    }else{
+        c->message = message_errorlogin;
+        send_message(c);
+        return 1;
     }
     return 0;
 }
 
 int handle_SYST(struct Client* c){
+    /*
+     * Handle SYST command.
+     * Return 215.
+     */
     if(!c->login){
         c->message = message_unlogin;
         send_message(c);
@@ -89,6 +132,12 @@ int handle_SYST(struct Client* c){
 }
 
 int handle_TYPE(struct Client* c, char* type){
+    /*
+     * Handle TYPE command.
+     * I for RETR and STOR, A for LIST.
+     * Return 501 if type is unsupported.
+     * Return 200 if successful.
+     */
     if(!c->login){
         c->message = message_unlogin;
         send_message(c);
@@ -112,7 +161,10 @@ int handle_TYPE(struct Client* c, char* type){
 }
 
 int handle_QUIT(struct Client* c){
-
+    /*
+     * Handle QUIT command.
+     * Return 221.
+     */
     c->message = "221 Goodbye!\r\n";
     send_message(c);
     close(c->sock);
@@ -121,6 +173,11 @@ int handle_QUIT(struct Client* c){
 }
 
 int handle_PORT(struct Client* c, char* s){
+    /*
+     * HANDLE PORT command.
+     * Return 425 if data connection can't establish.
+     * Return 200 if successful.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -136,12 +193,14 @@ int handle_PORT(struct Client* c, char* s){
     char ip[20];
     sprintf(ip, "%d.%d.%d.%d", h1, h2, h3, h4);
     if(inet_pton(AF_INET, ip, &(c->addr.sin_addr)) != 1){
-        perror("inet_pton error");
+        c->message = message_dataconnectionerror;
+        send_message(c);
         return 1;
     }
 
     if ((c->sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-		perror("socket error");
+        c->message = message_dataconnectionerror;
+        send_message(c);
 		return 1;
 	}
     c->mode = 1;
@@ -151,6 +210,14 @@ int handle_PORT(struct Client* c, char* s){
 }
 
 int handle_RETR(struct Client* c, char* filename){
+    /*
+     * Handle RETR command.
+     * Return 425 if data connection can't establish.
+     * Return 503 if mode undefined.
+     * Return 150 before transfer starts.
+     * Return 226 after transfer completes.
+     * Open a new thread to transfer file to avoid blocking other clients.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -161,8 +228,7 @@ int handle_RETR(struct Client* c, char* filename){
     if(c->mode == 1){
 
         if(connect(c->sockfd, (struct sockaddr*)&(c->addr), sizeof(c->addr)) == -1){
-            perror("connect error");
-            c->message = message_connectionerror;
+            c->message = message_dataconnectionerror;
             send_message(c);
             return 1;
         }
@@ -182,11 +248,10 @@ int handle_RETR(struct Client* c, char* filename){
     }else if(c->mode == 2){
 
         if((c->sockfd = accept(c->socklfd, NULL, NULL)) == -1){
-            perror("accept error");
+            c->message = message_dataconnectionerror;
+            send_message(c);
             return 1;
         }
-
-        printf("PASV accepted.\n");
 
         struct stat st;
         stat(filename, &st);
@@ -211,6 +276,11 @@ int handle_RETR(struct Client* c, char* filename){
 }
 
 int handle_PASV(struct Client* c){
+    /*
+     * Handle PASV command.
+     * Return 425 if data connection can't establish.
+     * Return 227 if successful.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -231,22 +301,26 @@ int handle_PASV(struct Client* c){
     char ip[20];
     sprintf(ip, "%d.%d.%d.%d", h1, h2, h3, h4);
     if(inet_pton(AF_INET, ip, &(c->addr.sin_addr)) != 1){
-        perror("inet_pton error");
+        c->message = message_dataconnectionerror;
+        send_message(c);
         return 1;
     }
 
     if ((c->socklfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-		perror("socket error");
+        c->message = message_dataconnectionerror;
+        send_message(c);
 		return 1;
 	}
 
     if(bind(c->socklfd, (struct sockaddr*)&c->addr, sizeof(c->addr)) == -1){
-        perror("bind error");
+        c->message = message_dataconnectionerror;
+        send_message(c);
         return 1;
     }
 
     if(listen(c->socklfd, 1) == -1){
-		perror("listen error");
+        c->message = message_dataconnectionerror;
+        send_message(c);
         return 1;
     }
 
@@ -260,6 +334,14 @@ int handle_PASV(struct Client* c){
 }
 
 int handle_STOR(struct Client* c, char* dir){
+    /*
+     * Handle STOR command.
+     * Return 425 if data connection can't establish.
+     * Return 503 if mode undefined.
+     * Return 150 before file transfer.
+     * Return 226 after file transfer.
+     * Open a new thread to transfer file avoiding other clients from being blocked.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -269,8 +351,7 @@ int handle_STOR(struct Client* c, char* dir){
 
     if(c->mode == 1){
         if(connect(c->sockfd, (struct sockaddr*)&(c->addr), sizeof(c->addr)) == -1){
-            perror("connect error");
-            c->message = message_connectionerror;
+            c->message = message_dataconnectionerror;
             send_message(c);
             return 1;
         }
@@ -287,11 +368,10 @@ int handle_STOR(struct Client* c, char* dir){
     }else if(c->mode == 2){
 
         if((c->sockfd = accept(c->socklfd, NULL, NULL)) == -1){
-            perror("accept error");
+            c->message = message_dataconnectionerror;
+            send_message(c);
             return 1;
         }
-
-        printf("PASV accepted.\n");
 
         char message[200];
         sprintf(message, "150 Opening BINARY mode data connection for %s.\r\n", dir);
@@ -312,6 +392,12 @@ int handle_STOR(struct Client* c, char* dir){
 }
 
 int handle_CWD(struct Client* c, char* dir){
+    /*
+     * Handle CWD command.
+     * Return 250 if Okay.
+     * Return 550 if not found.
+     * Store the new dir in c->dir if successful.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -337,9 +423,6 @@ int handle_CWD(struct Client* c, char* dir){
             return 1;
         }
     }else{
-        //char cur[200];
-        //strcpy(cur, c->dir);
-        //strcat(cur, dir);
 
         strcat(path, c->dir);
         strcat(path, dir);
@@ -360,6 +443,10 @@ int handle_CWD(struct Client* c, char* dir){
 }
 
 int handle_PWD(struct Client* c){
+    /*
+     * Handle PWD command.
+     * Return 257.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -376,6 +463,11 @@ int handle_PWD(struct Client* c){
 }
 
 int handle_MKD(struct Client* c, char* dir){
+    /*
+     * Handle MKD command.
+     * Return 250 if successful.
+     * Return 550 if created failed.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -404,6 +496,14 @@ int handle_MKD(struct Client* c, char* dir){
 }
 
 int handle_LIST(struct Client *c){
+    /*
+     * Handle LIST command.
+     * Return 425 if data connection can't establish.
+     * Return 150 before LIST info transfer.
+     * Return 226 after LIST info transfer.
+     * Return 503 if mode undefined.
+     * Open a new thread to transfer list info.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -414,8 +514,7 @@ int handle_LIST(struct Client *c){
     if(c->mode == 1){
 
         if(connect(c->sockfd, (struct sockaddr*)&(c->addr), sizeof(c->addr)) == -1){
-            perror("connect error");
-            c->message = message_connectionerror;
+            c->message = message_dataconnectionerror;
             send_message(c);
             return 1;
         }
@@ -432,11 +531,10 @@ int handle_LIST(struct Client *c){
     }else if(c->mode == 2){
 
         if((c->sockfd = accept(c->socklfd, NULL, NULL)) == -1){
-            perror("accept error");
+            c->message = message_dataconnectionerror;
+            send_message(c);
             return 1;
         }
-
-        printf("PASV accepted.\n");
 
         char message[200];
         sprintf(message, "150 Opening data connection for contents of current directory.\r\n");
@@ -456,6 +554,11 @@ int handle_LIST(struct Client *c){
 }
 
 int handle_RMD(struct Client* c, char* dir){
+    /*
+     * Handle RWD command.
+     * Return 250 if successful.
+     * Retutn 550 if not found.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -485,6 +588,11 @@ int handle_RMD(struct Client* c, char* dir){
 }
 
 int handle_RNFR(struct Client* c, char* dir){
+    /*
+     * Handle RNFR command.
+     * Return 350 if file or directory exists.
+     * Return 550 otherwise.
+     */
 
     if(!c->login){
         c->message = message_unlogin;
@@ -514,6 +622,12 @@ int handle_RNFR(struct Client* c, char* dir){
 }
 
 int handle_RNTO(struct Client* c, char* dir){
+    /*
+     * Handle RNTO command.
+     * Return 250 if successful.
+     * Return 550 if failed.
+     * Return 503 if RNFR not being sent before.
+     */
 
     if(!c->login){
         c->message = message_unlogin;

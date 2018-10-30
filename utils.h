@@ -30,4 +30,6 @@ int get_local_ip(int*, int*, int*, int*);
 
 int processing_command(char*, char*, char*);
 
+int checkuserinfo(char*, char*);
+
 #endif

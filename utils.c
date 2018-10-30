@@ -19,7 +19,7 @@ int deal_with_parameters(int* port, char* root_dir, int argc, char** argv){
         else if(strcmp(argv[2], "-root") == 0)
             strcpy(root_dir, argv[2]);
     }
-        
+
     if(argc == 5){
         for(int i = 0; i < 2; ++i)
             if(strcmp(argv[i * 2 + 1], "-port") == 0)
@@ -101,6 +101,7 @@ void *store_file(void *cv){
 
     char buffer[8192];
     int p = 0;
+    printf("before store.\n");
 
     while (1) {
         int bytes_read = read(c->sockfd, buffer + p, 8191 - p);
@@ -111,14 +112,14 @@ void *store_file(void *cv){
         } else if (bytes_read == 0) {
             break;
         }
-
         int file_state = write(fp, buffer, bytes_read);
         if(file_state == 0){
-            printf("Error when writing the file!");
+            printf("Error while writing the file!");
             break;
         }
     }
     close(fp);
+    printf("store completed.\n");
 
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
@@ -164,4 +165,16 @@ int get_local_ip(int *h1, int* h2, int* h3, int* h4){
     *h3 = 0;
     *h4 = 1;
     return 0;
+}
+
+int checkuserinfo(char* username, char* password){
+    FILE* fp = fopen("userinfo.txt", "r");
+    char user[200], pass[200];
+    while(fscanf(fp, "%s\n", user) != EOF){
+        printf("%s\n", user);
+        fscanf(fp, "%s\n", pass);
+        if(strcmp(user, username) == 0 && strcmp(pass, password) == 0)
+            return 0;
+    }
+    return -1;
 }

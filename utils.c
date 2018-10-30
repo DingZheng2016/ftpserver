@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 #include <sys/stat.h>
 
 #include "utils.h"
@@ -159,11 +160,13 @@ int get_random_port(){
     return rand() % (65536 - 20000) + 20000;
 }
 
-int get_local_ip(int *h1, int* h2, int* h3, int* h4){
-    *h1 = 127;
-    *h2 = 0;
-    *h3 = 0;
-    *h4 = 1;
+int get_local_ip(int sock, int *h1, int* h2, int* h3, int* h4){
+    socklen_t addr_size = sizeof(struct sockaddr_in);
+    struct sockaddr_in addr;
+    getsockname(sock, (struct sockaddr *)&addr, &addr_size);
+ 
+    char* host = inet_ntoa(addr.sin_addr);
+    sscanf(host,"%d.%d.%d.%d", h1, h2, h3, h4);
     return 0;
 }
 

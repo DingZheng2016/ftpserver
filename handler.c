@@ -292,7 +292,7 @@ int handle_PASV(struct Client* c){
     int p1 = rand_port / 256;
     int p2 = rand_port % 256;
     int h1, h2, h3, h4;
-    get_local_ip(&h1, &h2, &h3, &h4);
+    get_local_ip(c->sock, &h1, &h2, &h3, &h4);
 
     //sscanf(s, "%d,%d,%d,%d,%d,%d", &h1, &h2, &h3, &h4 ,&p1, &p2);
     memset(&(c->addr), 0, sizeof(c->addr));

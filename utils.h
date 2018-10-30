@@ -26,7 +26,7 @@ void *transfer_list(void*);
 
 int get_random_port();
 
-int get_local_ip(int*, int*, int*, int*);
+int get_local_ip(int, int*, int*, int*, int*);
 
 int processing_command(char*, char*, char*);
 

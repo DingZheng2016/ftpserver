@@ -426,7 +426,6 @@ int handle_CWD(struct Client* c, char* dir){
 
         strcat(path, c->dir);
         strcat(path, dir);
-
         DIR* d = opendir(path);
         if(d){
             c->message = "250 Okay.\r\n";

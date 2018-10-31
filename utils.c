@@ -131,7 +131,9 @@ void *store_file(void *cv){
 
 void *transfer_list(void *cv){
     struct Client* c = cv;
-    FILE *fs = popen("ls -l", "r");
+    char com[400];
+    sprintf(com, "ls -l %s%s", c->root_dir, c->dir);
+    FILE *fs = popen(com, "r");
     char buffer[8192];
     while(fgets(buffer, 8191, fs)){
         int p = 0;

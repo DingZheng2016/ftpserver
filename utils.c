@@ -49,7 +49,6 @@ int processing_command(char* s, char* cm, char* ms){
 }
 
 void *transfer_file(void* cv){
-    printf("before file transfer.\n");
     
     struct Client* c = cv;
 
@@ -68,7 +67,6 @@ void *transfer_file(void* cv){
             break;
 
         if (bytes_read < 0) {
-            perror("read error");
             return NULL;
         }
 
@@ -85,6 +83,7 @@ void *transfer_file(void* cv){
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
     close(c->sockfd);
+    close(c->socklfd);
     c->mode = 0;
     return NULL;
 }
@@ -102,12 +101,10 @@ void *store_file(void *cv){
 
     char buffer[8192];
     int p = 0;
-    printf("before store.\n");
 
     while (1) {
         int bytes_read = read(c->sockfd, buffer + p, 8191 - p);
         if (bytes_read < 0) {
-            perror("read error.");
             close(c->sockfd);
             break;
         } else if (bytes_read == 0) {
@@ -115,16 +112,15 @@ void *store_file(void *cv){
         }
         int file_state = write(fp, buffer, bytes_read);
         if(file_state == 0){
-            printf("Error while writing the file!");
             break;
         }
     }
     close(fp);
-    printf("store completed.\n");
 
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
     close(c->sockfd);
+    close(c->socklfd);
     c->mode = 0;
     return NULL;
 }
@@ -141,7 +137,6 @@ void *transfer_list(void *cv){
         while (p < len) {
             int n = write(c->sockfd, buffer + p, len - p);
             if (n < 0) {
-                perror("write error.");
                 close(c->sockfd);
                 return NULL;
             } else {
@@ -153,6 +148,7 @@ void *transfer_list(void *cv){
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
     close(c->sockfd);
+    close(c->socklfd);
     c->mode = 0;
     return NULL;
 }

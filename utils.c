@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 
 #include "utils.h"
 
@@ -178,4 +179,28 @@ int checkuserinfo(char* username, char* password){
             return 0;
     }
     return -1;
+}
+
+void resolvepath(char* rootpath, char* currentpath, char* result){
+    int len = strlen(rootpath);
+    if(len >= strlen(currentpath)){
+        result[0] = '/';
+        result[1] = '\0';
+        return;
+    }
+    int legal = 1;
+    for(int i = 0; i < len; ++i)
+        if(rootpath[i] != currentpath[i]){
+            legal = 0;
+            break;
+        }
+    if(legal){
+        for(int i = len; i < strlen(currentpath); ++i)
+            result[i - len] = currentpath[i];
+        result[strlen(currentpath) - len] = '/';
+        result[strlen(currentpath) - len + 1] = '\0';
+    }else{
+        result[0] = '/';
+        result[1] = '\0';
+    }
 }

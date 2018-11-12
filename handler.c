@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <stdlib.h>
 
 #include "handler.h"
 #include "utils.h"
@@ -414,9 +415,11 @@ int handle_CWD(struct Client* c, char* dir){
         strcat(path, dir);
         DIR* d = opendir(path);
         if(d){
+            char currentpath[200];
+            realpath(path, currentpath);
+            resolvepath(c->root_dir, currentpath, c->dir);
             c->message = "250 Okay.\r\n";
             send_message(c);
-            strcpy(c->dir, dir);
         }else{
             c->message = "550 No such file or directory.\r\n";
             send_message(c);
@@ -428,9 +431,11 @@ int handle_CWD(struct Client* c, char* dir){
         strcat(path, dir);
         DIR* d = opendir(path);
         if(d){
+            char currentpath[200];
+            realpath(path, currentpath);
+            resolvepath(c->root_dir, currentpath, c->dir);
             c->message = "250 Okay.\r\n";
             send_message(c);
-            strcat(c->dir, dir);
         }else{
             c->message = "550 No such file or directory.\r\n";
             send_message(c);

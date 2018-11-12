@@ -32,4 +32,6 @@ int processing_command(char*, char*, char*);
 
 int checkuserinfo(char*, char*);
 
+void resolvepath(char*, char*, char*);
+
 #endif

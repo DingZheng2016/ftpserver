@@ -30,6 +30,7 @@ struct Client{
     int type;// 1 for I, 10 for A
     int filefd;
     int mode; // 1 for PORT, 2 for PASV, 0 for none
+    int skip_bytes;
 };
 
 void init_server(struct Server*, int, char*);

@@ -54,6 +54,8 @@ int handle_command(struct Client* c, char* command, char* message){
         handle_RNFR(c, message);
     else if(strcmp(command, "RNTO") == 0)
         handle_RNTO(c, message);
+    else if(strcmp(command, "REST") == 0)
+        handle_REST(c, message);
     else{
         c->message = message_unknowncommand;
         send_message(c);
@@ -663,6 +665,19 @@ int handle_RNTO(struct Client* c, char* dir){
     }
 
     memset(c->rn_be, 0, sizeof(c->rn_be));
+
+    return 0;
+}
+
+int handle_REST(struct Client* c, char* bytes){
+    /*
+     * Handle REST command.
+     * Set bytes to the given number.
+     * Next RETR will skip those bytes.
+     */
+    c->skip_bytes = atoi(bytes);
+    c->message = "350 Restart position accepted.\r\n";
+    send_message(c);
 
     return 0;
 }

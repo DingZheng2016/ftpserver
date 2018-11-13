@@ -137,6 +137,8 @@ void run_server(struct Server *sv){
 
             sentence[p - 1] = '\0';
 
+	    printf("%s\n", sentence);
+
             char command[20];
             char message[200];
 
@@ -154,5 +156,6 @@ void init_client(struct Client* c){
     c->filefd = -1;
     c->login = 0;
     c->type = 0;
+    c->skip_bytes = 0;
     memset(c->rn_be, 0, sizeof(c->rn_be));
 }

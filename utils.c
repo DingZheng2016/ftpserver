@@ -58,8 +58,12 @@ void *transfer_file(void* cv){
     strcpy(file_path, c->root_dir);
     strcat(file_path, c->dir);
     strcat(file_path, c->filename);
-    printf("%s\n", file_path);
     c->filefd = open(file_path,  O_RDONLY);
+
+    int times = c->skip_bytes / sizeof(buffer);
+    while(times--)
+        read(c->filefd, buffer, sizeof(buffer));
+    read(c->filefd, buffer, c->skip_bytes % sizeof(buffer));
 
     while (1) {
         int bytes_read = read(c->filefd, buffer, sizeof(buffer));
@@ -83,6 +87,7 @@ void *transfer_file(void* cv){
     }
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
+    c->skip_bytes = 0;
     close(c->sockfd);
     close(c->socklfd);
     c->mode = 0;

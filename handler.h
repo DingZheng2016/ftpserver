@@ -37,4 +37,6 @@ int handle_RNFR(struct Client*, char*);
 
 int handle_RNTO(struct Client*, char*);
 
+int handle_REST(struct Client*, char*);
+
 #endif

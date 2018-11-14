@@ -290,41 +290,34 @@ int handle_PASV(struct Client* c){
         send_message(c);
         return 1;
     }
+    
+    int rand_port, p1, p2, h1, h2, h3, h4;
 
-    int rand_port = get_random_port();
-    int p1 = rand_port / 256;
-    int p2 = rand_port % 256;
-    int h1, h2, h3, h4;
     get_local_ip(c->sock, &h1, &h2, &h3, &h4);
-
-    //sscanf(s, "%d,%d,%d,%d,%d,%d", &h1, &h2, &h3, &h4 ,&p1, &p2);
-    memset(&(c->addr), 0, sizeof(c->addr));
-    c->addr.sin_port = htons(rand_port);
-    c->addr.sin_family = AF_INET;
     char ip[20];
     sprintf(ip, "%d.%d.%d.%d", h1, h2, h3, h4);
-    if(inet_pton(AF_INET, ip, &(c->addr.sin_addr)) != 1){
-        c->message = message_dataconnectionerror;
-        send_message(c);
-        return 1;
-    }
+    
+    while(1){
+        rand_port = get_random_port();
+        p1 = rand_port / 256;
+        p2 = rand_port % 256;
 
-    if ((c->socklfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-        c->message = message_dataconnectionerror;
-        send_message(c);
-		return 1;
-	}
+        memset(&(c->addr), 0, sizeof(c->addr));
+        c->addr.sin_port = htons(rand_port);
+        c->addr.sin_family = AF_INET;
+        if(inet_pton(AF_INET, ip, &(c->addr.sin_addr)) != 1)
+            continue;
 
-    if(bind(c->socklfd, (struct sockaddr*)&c->addr, sizeof(c->addr)) == -1){
-        c->message = message_dataconnectionerror;
-        send_message(c);
-        return 1;
-    }
+        if ((c->socklfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) 
+            continue;
 
-    if(listen(c->socklfd, 1) == -1){
-        c->message = message_dataconnectionerror;
-        send_message(c);
-        return 1;
+        if(bind(c->socklfd, (struct sockaddr*)&c->addr, sizeof(c->addr)) == -1)
+            continue;
+        
+        if(listen(c->socklfd, 1) == -1)
+            continue;
+
+        break;
     }
 
     c->mode = 2;

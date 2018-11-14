@@ -160,7 +160,7 @@ void *transfer_list(void *cv){
 }
 
 int get_random_port(){
-    srand((unsigned)(time(NULL)));
+    //srand((unsigned)(time(NULL)));
     return rand() % (65536 - 20000) + 20000;
 }
 

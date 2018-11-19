@@ -178,7 +178,6 @@ int checkuserinfo(char* username, char* password){
     FILE* fp = fopen("userinfo.txt", "r");
     char user[200], pass[200];
     while(fscanf(fp, "%s\n", user) != EOF){
-        printf("%s\n", user);
         fscanf(fp, "%s\n", pass);
         if(strcmp(user, username) == 0 && strcmp(pass, password) == 0)
             return 0;

@@ -137,8 +137,6 @@ void run_server(struct Server *sv){
 
             sentence[p - 1] = '\0';
 
-	    printf("%s\n", sentence);
-
             char command[20];
             char message[200];
 

@@ -103,7 +103,10 @@ void *store_file(void *cv){
     strcat(file_path, c->filename);
 
     int fp;
-    fp = open(file_path, O_WRONLY | O_CREAT , S_IRWXG | S_IRWXO | S_IRWXU);
+    if(c->skip_bytes == 0)
+        fp = open(file_path, O_WRONLY | O_CREAT , S_IRWXG | S_IRWXO | S_IRWXU);
+    else
+        fp = open(file_path, O_WRONLY | O_APPEND, S_IRWXG | S_IRWXO | S_IRWXU);
 
     char buffer[8192];
     int p = 0;
@@ -125,6 +128,7 @@ void *store_file(void *cv){
 
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
+    c->skip_bytes = 0;
     close(c->sockfd);
     close(c->socklfd);
     c->mode = 0;

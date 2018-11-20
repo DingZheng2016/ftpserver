@@ -235,12 +235,9 @@ int handle_RETR(struct Client* c, char* filename){
             send_message(c);
             return 1;
         }
-        struct stat st;
-        stat(filename, &st);
-        int size = st.st_size;
 
         char message[200];
-        sprintf(message, "150 Opening BINARY mode data connection for %s (%d bytes).\r\n", filename, size);
+        sprintf(message, "150 Opening BINARY mode data connection for %s.\r\n", filename);
         c->message = message;
         send_message(c);
 

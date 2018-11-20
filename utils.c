@@ -60,13 +60,19 @@ void *transfer_file(void* cv){
     strcat(file_path, c->filename);
     c->filefd = open(file_path,  O_RDONLY);
 
-    int times = c->skip_bytes / sizeof(buffer);
+    int filefd = c->filefd;
+    int sockfd = c->sockfd;
+    int skip_bytes = c->skip_bytes;
+    int socklfd = c->socklfd;
+    c->skip_bytes = 0;
+
+    int times = skip_bytes / sizeof(buffer);
     while(times--)
-        read(c->filefd, buffer, sizeof(buffer));
-    read(c->filefd, buffer, c->skip_bytes % sizeof(buffer));
+        read(filefd, buffer, sizeof(buffer));
+    read(filefd, buffer, skip_bytes % sizeof(buffer));
 
     while (1) {
-        int bytes_read = read(c->filefd, buffer, sizeof(buffer));
+        int bytes_read = read(filefd, buffer, sizeof(buffer));
 
         if (bytes_read == 0)
             break;
@@ -77,7 +83,7 @@ void *transfer_file(void* cv){
 
         void *p = buffer;
         while (bytes_read > 0) {
-            int bytes_written = write(c->sockfd, p, bytes_read);
+            int bytes_written = write(sockfd, p, bytes_read);
             if (bytes_written <= 0) {
                 return NULL;
             }
@@ -87,9 +93,8 @@ void *transfer_file(void* cv){
     }
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
-    c->skip_bytes = 0;
-    close(c->sockfd);
-    close(c->socklfd);
+    close(sockfd);
+    close(socklfd);
     c->mode = 0;
     return NULL;
 }
@@ -101,9 +106,13 @@ void *store_file(void *cv){
     strcpy(file_path, c->root_dir);
     strcat(file_path, c->dir);
     strcat(file_path, c->filename);
+    int skip_bytes = c->skip_bytes;
+    int sockfd = c->sockfd;
+    int socklfd = c->socklfd;
+    c->skip_bytes = 0;
 
     int fp;
-    if(c->skip_bytes == 0)
+    if(skip_bytes == 0)
         fp = open(file_path, O_WRONLY | O_CREAT , S_IRWXG | S_IRWXO | S_IRWXU);
     else
         fp = open(file_path, O_WRONLY | O_APPEND, S_IRWXG | S_IRWXO | S_IRWXU);
@@ -112,9 +121,9 @@ void *store_file(void *cv){
     int p = 0;
 
     while (1) {
-        int bytes_read = read(c->sockfd, buffer + p, 8191 - p);
+        int bytes_read = read(sockfd, buffer + p, 8191 - p);
         if (bytes_read < 0) {
-            close(c->sockfd);
+            close(sockfd);
             break;
         } else if (bytes_read == 0) {
             break;
@@ -128,9 +137,8 @@ void *store_file(void *cv){
 
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
-    c->skip_bytes = 0;
-    close(c->sockfd);
-    close(c->socklfd);
+    close(sockfd);
+    close(socklfd);
     c->mode = 0;
     return NULL;
 }
@@ -141,13 +149,16 @@ void *transfer_list(void *cv){
     sprintf(com, "ls -l %s%s", c->root_dir, c->dir);
     FILE *fs = popen(com, "r");
     char buffer[8192];
+    int sockfd = c->sockfd;
+    int socklfd = c->socklfd;
+
     while(fgets(buffer, 8191, fs)){
         int p = 0;
         int len = strlen(buffer);
         while (p < len) {
-            int n = write(c->sockfd, buffer + p, len - p);
+            int n = write(sockfd, buffer + p, len - p);
             if (n < 0) {
-                close(c->sockfd);
+                close(sockfd);
                 return NULL;
             } else {
                 p += n;
@@ -157,8 +168,8 @@ void *transfer_list(void *cv){
 
     c->message = "226 Transfer complete.\r\n";
     send_message(c);
-    close(c->sockfd);
-    close(c->socklfd);
+    close(sockfd);
+    close(socklfd);
     c->mode = 0;
     return NULL;
 }
